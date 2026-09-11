@@ -17,7 +17,7 @@ shared code.
 
 ```
 [button node]                  [voice satellite]
- ESPHome, arcade button  ──►    ESPHome / Voice PE
+ ESPHome, arcade button  ──►    ESPHome ESP32-S3
  + LED ring                     mic + speaker
        │                               │
        │ binary_sensor                 │ audio (ESPHome API)
@@ -120,7 +120,7 @@ hardware yet.
 | Document | What it covers |
 | --- | --- |
 | [docs/setup.md](docs/setup.md) | Installing and configuring the add-on, Home Assistant and the nodes |
-| [docs/hardware.md](docs/hardware.md) | Satellite choice, the Voice PE fork question, wiring |
+| [docs/hardware.md](docs/hardware.md) | Satellite choice, wiring, and the ring's states |
 | [docs/transports.md](docs/transports.md) | Telegram, Signal, and why WhatsApp Cloud does not fit |
 | [docs/verification.md](docs/verification.md) | What still has to be proven on real hardware |
 | [docs/privacy.md](docs/privacy.md) | What is recorded, when, and where it goes |

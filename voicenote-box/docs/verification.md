@@ -31,7 +31,6 @@ current criterion is physically met.
       survive past 30 seconds on your board**, or does the API audio stream
       time out? This is the plan's second open question and it can only be
       answered on hardware. Try 10s, 30s, 60s.
-- [ ] The Voice PE fork decision is made and written down.
 
 ## Phase 2 — local loopback
 

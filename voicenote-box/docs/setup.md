@@ -108,8 +108,8 @@ instead of a confirmation.
 `substitutions` and add the secrets it references.
 
 `esphome/satellite-overlay.yaml` is **not** standalone — merge its two blocks
-into your existing satellite configuration. Read
-[hardware.md](hardware.md) first if your satellite is a Voice PE.
+into your existing satellite configuration. That satellite has to be one
+whose firmware you build yourself; see [hardware.md](hardware.md).
 
 ## 7. Check it
 

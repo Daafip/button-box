@@ -23,4 +23,7 @@ jobs:
       - uses: oven-sh/setup-bun@v2
         with:
           bun-version: "1.3.14"
+      # The add-on manifest tests read config.yaml. Without PyYAML they skip
+      # silently, which is worse than not having them.
+      - run: pip install "PyYAML==6.0.3"
       - run: make check

@@ -4,9 +4,9 @@
 # the microphone stay exactly as they were. These actions only exist so an
 # external button can drive the same voice assistant without a wake word.
 #
-# On an Atom Echo or a DIY ESP32-S3 this is a few lines in YAML you already
-# own. On a Voice PE it means forking home-assistant-voice-pe and carrying
-# the fork across upstream releases -- see docs/hardware.md before choosing.
+# The satellite has to be one whose firmware you build yourself -- an Atom
+# Echo or a DIY ESP32-S3, where this is a few lines in YAML you already own.
+# A Home Assistant Voice PE is not supported; see docs/hardware.md.
 
 api:
   actions:
