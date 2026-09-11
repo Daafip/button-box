@@ -1,0 +1,43 @@
+# Merge these two blocks into an existing ESPHome voice satellite.
+#
+# Nothing else about the satellite changes: the wake word, the pipeline and
+# the microphone stay exactly as they were. These actions only exist so an
+# external button can drive the same voice assistant without a wake word.
+#
+# On an Atom Echo or a DIY ESP32-S3 this is a few lines in YAML you already
+# own. On a Voice PE it means forking home-assistant-voice-pe and carrying
+# the fork across upstream releases -- see docs/hardware.md before choosing.
+
+api:
+  actions:
+    # Ordering matters. Home Assistant arms the add-on's mode flag *before*
+    # calling this, so the first audio chunk is already tagged as a note.
+    - action: start_voicenote
+      then:
+        # Stop the wake word first: without this the confirmation played back
+        # through the speaker can retrigger the satellite.
+        - micro_wake_word.stop:
+        - voice_assistant.start:
+            # Hold-to-talk. Voice activity detection would cut the recording
+            # off at the speaker's first pause.
+            silence_detection: false
+
+    - action: stop_voicenote
+      then:
+        - voice_assistant.stop:
+        # Let the speaker finish the spoken confirmation before the wake word
+        # starts listening again.
+        - delay: 500ms
+        - micro_wake_word.start:
+
+# Safety net. If Home Assistant never sends stop_voicenote -- the automation
+# was reloaded, the network dropped -- the satellite must not record forever.
+voice_assistant:
+  on_start:
+    - delay: 120s
+    - if:
+        condition: voice_assistant.is_running
+        then:
+          - logger.log: "voice assistant ran past the recording cap; stopping"
+          - voice_assistant.stop:
+          - micro_wake_word.start:

@@ -1,0 +1,7 @@
+# Only the Python package is needed in the image.
+tests/
+docs/
+esphome/
+homeassistant/
+*.md
+Makefile

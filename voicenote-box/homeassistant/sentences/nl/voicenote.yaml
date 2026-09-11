@@ -1,0 +1,20 @@
+# Custom sentences that match the canned transcripts the add-on returns in
+# place of the real one. Copy to config/custom_sentences/nl/voicenote.yaml.
+#
+# The confirmation reaches the speaker through the ordinary text-to-speech
+# path, so no extra audio plumbing is needed on the satellite.
+#
+# Keep these in step with the sent_sentence and failed_sentence add-on
+# options. If they drift apart, Assist answers "sorry, dat begreep ik niet"
+# and the caregiver hears that instead of a confirmation.
+
+language: nl
+intents:
+  VoicenoteSent:
+    data:
+      - sentences:
+          - "stuur spraakbericht"
+  VoicenoteFailed:
+    data:
+      - sentences:
+          - "spraakbericht mislukt"

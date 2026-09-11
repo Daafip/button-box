@@ -1,0 +1,92 @@
+name: Voice Note Box
+version: "0.1.0"
+slug: voicenote_box
+description: >-
+  Turns an Assist satellite into a voice note box: hold a button, speak, and
+  the note goes to an approved contact. Normal wake-word Assist keeps working.
+url: https://github.com/example/button-box/tree/main/voicenote-box
+arch:
+  - aarch64
+  - amd64
+  - armv7
+init: false
+startup: services
+boot: auto
+
+# 10400 is the Wyoming speech-to-text service Home Assistant connects to.
+# 8099 is the control API and the media URLs the satellite fetches.
+ports:
+  10400/tcp: 10400
+  8099/tcp: 8099
+ports_description:
+  10400/tcp: Wyoming speech-to-text proxy
+  8099/tcp: Control API and media
+
+ingress: true
+ingress_port: 8098
+panel_icon: mdi:voicemail
+panel_title: Voice notes
+
+# The add-on announces the notes on the satellite itself, which needs the
+# core API through the Supervisor proxy.
+homeassistant_api: true
+hassio_api: false
+
+services:
+  - mqtt:need
+
+# No map: everything persistent lives in /data, which every add-on gets.
+
+options:
+  upstream_stt_host: core-whisper
+  upstream_stt_port: 10300
+  api_token: ""
+  media_base_url: ""
+  announce_entity: ""
+  media_player_entity: ""
+  sent_sentence: stuur spraakbericht
+  failed_sentence: spraakbericht mislukt
+  max_recording_seconds: 60
+  rate_limit_per_hour: 20
+  assist_recording_retention_seconds: 0
+  settled_retention_days: 14
+  transport: telegram
+  telegram_token: ""
+  signal_api_url: http://localhost:8080
+  signal_number: ""
+  signal_api_user: ""
+  signal_api_password: ""
+  wacli_binary: /usr/local/bin/wacli
+  wacli_lock_wait: 60s
+  whatsapp_phone_number_id: ""
+  whatsapp_token: ""
+  poll_interval_seconds: 5
+  device_name: Voice Note Box
+  log_level: INFO
+
+schema:
+  upstream_stt_host: str
+  upstream_stt_port: port
+  api_token: password
+  media_base_url: str?
+  announce_entity: str?
+  media_player_entity: str?
+  sent_sentence: str
+  failed_sentence: str
+  max_recording_seconds: int(5,300)
+  rate_limit_per_hour: int(0,1000)
+  assist_recording_retention_seconds: int(0,604800)
+  settled_retention_days: int(1,365)
+  transport: list(telegram|signal|wacli|whatsapp_cloud)
+  telegram_token: password?
+  signal_api_url: str?
+  signal_number: str?
+  signal_api_user: str?
+  signal_api_password: password?
+  wacli_binary: str
+  wacli_lock_wait: str
+  whatsapp_phone_number_id: str?
+  whatsapp_token: password?
+  poll_interval_seconds: float(1,300)
+  device_name: str
+  log_level: list(DEBUG|INFO|WARNING|ERROR)

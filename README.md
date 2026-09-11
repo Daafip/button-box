@@ -533,6 +533,8 @@ GPIO, NFC, Wi-Fi, or WhatsApp behaviors were physically tested.
 - `sounds/`: audio licensing requirements and future assets
 - `tests/`: synthetic unit and contract tests
 - `docs/`: architecture, installation, testing, and developer documentation
+- `voicenote-box/`: [a separate Home Assistant + ESPHome build](voicenote-box/README.md) of the
+  same idea, sharing no code with the Raspberry Pi runtime above
 
 ## License and acknowledgements
 

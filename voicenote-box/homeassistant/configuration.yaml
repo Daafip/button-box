@@ -1,0 +1,14 @@
+# Snippets for configuration.yaml.
+#
+# Put the Voice Note Box files in config/voicenote/ and the custom sentences
+# in config/custom_sentences/nl/.
+#
+# The speech-to-text side is wired up in the UI, not here: add the add-on as
+# a Wyoming Protocol integration (host = the add-on, port = 10400) and select
+# it as the speech-to-text engine of your existing Assist pipeline. There is
+# still exactly one pipeline and one satellite configuration.
+
+rest_command: !include voicenote/rest_command.yaml
+intent_script: !include voicenote/intent_script.yaml
+
+automation voicenote: !include voicenote/automations.yaml

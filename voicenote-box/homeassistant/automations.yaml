@@ -1,0 +1,94 @@
+# Voice Note Box automations.
+#
+# Include from configuration.yaml as:
+#   automation voicenote: !include voicenote/automations.yaml
+#
+# Replace the entity ids marked CHANGE ME with your own.
+
+- id: voicenote_hold_to_record
+  alias: Voice note - hold to record
+  mode: single
+  # Overlapping recordings would interleave two people's audio in one note.
+  max_exceeded: silent
+  triggers:
+    - trigger: state
+      entity_id: binary_sensor.voicenote_button_button  # CHANGE ME
+      to: "on"
+      # Longer than the node's short-press window, so a tap plays a reply
+      # instead of starting a recording.
+      for: "00:00:00.6"
+  actions:
+    # Ordering matters: the flag must be set before the microphone opens,
+    # or the first chunks arrive tagged as an ordinary Assist command.
+    - action: rest_command.voicenote_arm
+      response_variable: armed
+    # A refusal (nobody selected, unknown recipient) stops here. The box
+    # never falls back to a default contact.
+    - if:
+        - condition: template
+          value_template: "{{ armed.status != 200 }}"
+      then:
+        - action: light.turn_on
+          target:
+            entity_id: light.voicenote_button_ring  # CHANGE ME
+          data:
+            rgb_color: [255, 0, 0]
+            brightness_pct: 60
+            flash: short
+        - stop: "no recipient selected"
+
+    - action: esphome.voicenote_satellite_start_voicenote  # CHANGE ME
+
+    - wait_for_trigger:
+        - trigger: state
+          entity_id: binary_sensor.voicenote_button_button  # CHANGE ME
+          to: "off"
+      # Matches the recording cap in the add-on options and the satellite's
+      # own safety net.
+      timeout: "00:01:00"
+      continue_on_timeout: true
+
+    - action: esphome.voicenote_satellite_stop_voicenote  # CHANGE ME
+
+- id: voicenote_short_press_plays_next
+  alias: Voice note - short press plays the next reply
+  mode: single
+  max_exceeded: silent
+  triggers:
+    - trigger: event
+      event_type: esphome.voicenote_short_press
+  conditions:
+    - condition: numeric_state
+      entity_id: sensor.voicenote_box_unread
+      above: 0
+  actions:
+    # The add-on announces on the satellite and marks the note read only
+    # once playback was accepted.
+    - action: button.press
+      target:
+        entity_id: button.voicenote_box_play_next
+
+- id: voicenote_tag_selects_recipient
+  alias: Voice note - a tag chooses who to send to
+  mode: queued
+  triggers:
+    - trigger: event
+      event_type: tag_scanned
+  actions:
+    - action: rest_command.voicenote_select_tag
+      data:
+        tag: "{{ trigger.event.data.tag_id }}"
+      response_variable: selected
+    - if:
+        - condition: template
+          value_template: "{{ selected.status != 200 }}"
+      then:
+        # An unmapped tag refuses. Showing that is the whole point: the box
+        # must not quietly keep the previous recipient without saying so.
+        - action: light.turn_on
+          target:
+            entity_id: light.voicenote_button_ring  # CHANGE ME
+          data:
+            rgb_color: [255, 0, 0]
+            brightness_pct: 60
+            flash: long

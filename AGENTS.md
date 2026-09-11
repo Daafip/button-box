@@ -17,6 +17,8 @@ Keep changes simple, direct, and maintainable. The goal is working software that
 Put code where its purpose is obvious:
 
 - Runtime Python belongs in `messagebox/`.
+- The Home Assistant add-on is a separate project in `voicenote-box/`; its code,
+  tests, and documentation stay inside that directory.
 - Developer-only scripts belong in `scripts/dev/`.
 - Operator commands belong in `scripts/commands/`.
 - Installation helpers belong in `scripts/install/`.

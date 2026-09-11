@@ -1,0 +1,18 @@
+# intent_script:
+#
+# Include from configuration.yaml as:
+#   intent_script: !include voicenote/intent_script.yaml
+#
+# These two replies are the only feedback the speaker gets about whether a
+# note was queued, so the failure case has to be as audible as the success.
+
+VoicenoteSent:
+  speech:
+    text: >-
+      Verzonden naar {{ states('select.voicenote_box_recipient')
+      if states('select.voicenote_box_recipient')
+      not in ['unknown', 'unavailable', 'geen'] else 'je contact' }}.
+
+VoicenoteFailed:
+  speech:
+    text: "Het spraakbericht is niet verzonden. Kies eerst een contact."

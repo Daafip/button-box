@@ -1,0 +1,55 @@
+# rest_command:
+#
+# The add-on's control API. Include from configuration.yaml as:
+#   rest_command: !include voicenote/rest_command.yaml
+#
+# YAML cannot join !secret to a string, so the full URLs live in secrets.yaml:
+#
+#   voicenote_mode_url: "http://homeassistant.local:8099/api/mode"
+#   voicenote_recipient_url: "http://homeassistant.local:8099/api/recipient"
+#   voicenote_play_next_url: "http://homeassistant.local:8099/api/play_next"
+#   voicenote_authorization: "Bearer <the api_token from the add-on options>"
+
+# Arms voice note mode. Called before the microphone opens; with no recipient
+# the add-on uses the one currently selected, and refuses if none is.
+voicenote_arm:
+  url: !secret voicenote_mode_url
+  method: POST
+  headers:
+    Authorization: !secret voicenote_authorization
+    Content-Type: application/json
+  payload: >-
+    {"mode": "voicenote"{% if recipient is defined and recipient %}, "recipient": "{{ recipient }}"{% endif %}}
+  timeout: 5
+
+# Returns the box to ordinary Assist. The flag is one-shot anyway; this is
+# for aborts, where no utterance ever reached the add-on.
+voicenote_disarm:
+  url: !secret voicenote_mode_url
+  method: POST
+  headers:
+    Authorization: !secret voicenote_authorization
+    Content-Type: application/json
+  payload: '{"mode": "assist"}'
+  timeout: 5
+
+# Chooses the recipient from a scanned NFC tag. An unmapped tag returns 400
+# and leaves the previous selection untouched.
+voicenote_select_tag:
+  url: !secret voicenote_recipient_url
+  method: POST
+  headers:
+    Authorization: !secret voicenote_authorization
+    Content-Type: application/json
+  payload: '{"tag": "{{ tag }}"}'
+  timeout: 5
+
+# Announces the oldest unread reply on the satellite and marks it read.
+voicenote_play_next:
+  url: !secret voicenote_play_next_url
+  method: POST
+  headers:
+    Authorization: !secret voicenote_authorization
+    Content-Type: application/json
+  payload: "{}"
+  timeout: 60
