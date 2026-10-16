@@ -38,6 +38,7 @@ from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 from pathlib import Path
 
 from messagebox.contacts import ContactError, ContactStore, validate_contact
+from messagebox.identity import read_box_id
 from messagebox.nfc import router as nfc_router
 from messagebox.nfc_state import NfcError, active_selection
 from messagebox.runtime_paths import APP_DIR, CONTACTS_FILE, OUTBOX_DIR as DEFAULT_OUTBOX_DIR
@@ -51,6 +52,12 @@ from messagebox.listened_receipts import (
 )
 from messagebox.onboarding.recipients import RecipientError, RecipientSetup
 from messagebox.onboarding.whatsapp import PairingEngine, PairingError, normalize_phone
+from messagebox.played_history import (
+    list_played_history,
+    played_history_lock,
+    read_played_file,
+    requeue_played_file,
+)
 from messagebox.settings import (
     RINGTONES,
     RevisionConflict,
@@ -71,6 +78,7 @@ PORT = int(os.environ.get("MSGBOX_DASH_PORT", "80"))
 QUEUE_DIR = str(DEFAULT_QUEUE_DIR)
 HOLD_DIR = os.path.join(QUEUE_DIR, ".hold")
 TRASH_DIR = os.path.join(QUEUE_DIR, ".trash")
+PLAYED_DIR = os.path.join(QUEUE_DIR, ".played")
 OUTBOX_DIR = str(DEFAULT_OUTBOX_DIR)
 EVENTS_FILE = str(STATE_DIR / "events.jsonl")
 WACLI_BIN = "/usr/local/bin/wacli"
@@ -96,6 +104,10 @@ DASHBOARD_STATIC = {
     "/static/styles.css": (
         DASHBOARD_STATIC_DIR.joinpath("styles.css").read_bytes(),
         "text/css; charset=utf-8",
+    ),
+    "/static/clipboard.js": (
+        DASHBOARD_STATIC_DIR.joinpath("clipboard.js").read_bytes(),
+        "text/javascript; charset=utf-8",
     ),
 }
 RINGTONE_PREVIEW_LOCK = threading.Lock()
@@ -144,6 +156,19 @@ def whatsapp_authenticated(value):
     if isinstance(value, list):
         return any(whatsapp_authenticated(item) for item in value)
     return False
+
+
+def runtime_running():
+    try:
+        result = subprocess.run(
+            ["systemctl", "is-active", "--quiet", "messagebox-button.service"],
+            capture_output=True,
+            check=False,
+            timeout=2,
+        )
+    except (OSError, subprocess.SubprocessError):
+        return False
+    return result.returncode == 0
 
 
 def runtime_state():
@@ -203,6 +228,7 @@ def runtime_state():
         "mode": "RUNTIME",
         "phase": "COMPLETE",
         "product": "Button Box",
+        "box_id": read_box_id(),
         "setup": {
             "wifi": "complete" if wifi_connected else "attention",
             "whatsapp": "complete" if whatsapp_connected else "attention",
@@ -218,7 +244,7 @@ def runtime_state():
             "wifi": "connected" if wifi_connected else "attention",
             "network_name": network_name,
             "whatsapp": "connected" if whatsapp_connected else "attention",
-            "runtime": "running",
+            "runtime": "running" if runtime_running() else "attention",
             "software_version": os.environ.get("MSGBOX_VERSION", "installed"),
         },
     }
@@ -235,17 +261,16 @@ def preview_ringtone(ringtone_id):
     if not RINGTONE_PREVIEW_LOCK.acquire(blocking=False):
         raise SettingsError("Button Box audio is busy")
 
-    def play():
-        try:
-            subprocess.run(
-                ["aplay", "-q", "-D", os.environ.get("MSGBOX_SPK_DEV", "default"), os.fspath(path)],
-                check=False,
-                timeout=30,
-            )
-        finally:
-            RINGTONE_PREVIEW_LOCK.release()
-
-    threading.Thread(target=play, daemon=True).start()
+    try:
+        subprocess.run(
+            ["aplay", "-q", "-D", os.environ.get("MSGBOX_SPK_DEV", "default"), os.fspath(path)],
+            check=True,
+            timeout=30,
+        )
+    except (OSError, subprocess.SubprocessError) as exc:
+        raise SettingsError("Button Box audio could not play") from exc
+    finally:
+        RINGTONE_PREVIEW_LOCK.release()
 
 
 def log_event(**ev):
@@ -420,13 +445,18 @@ def resolve_message_token(token, expected_kind):
     return value[1]
 
 
-def move_queue_message(source_dir, destination_dir, name, *, exposing_to_player):
+def move_queue_message(
+    source_dir, destination_dir, name, *, queue_dir, exposing_to_player
+):
     """Move a WAV and routing sidecar without exposing a metadata-less item."""
     source = os.path.join(source_dir, name)
     destination = os.path.join(destination_dir, name)
     source_meta = source + ".json"
     destination_meta = destination + ".json"
-    with QUEUE_ACTION_LOCK:
+    # The cross-process history lock is always acquired before the dashboard's
+    # process-local action lock. Replay scans and every queue move therefore
+    # observe one complete state without holding either lock during playback.
+    with played_history_lock(queue_dir), QUEUE_ACTION_LOCK:
         if not os.path.exists(source):
             raise FileNotFoundError(source)
         if os.path.exists(destination) or os.path.exists(destination_meta):
@@ -630,7 +660,7 @@ def build_guided_observability(events, names, outbox_states=None, now=None, limi
         elif kind == "guided_playback_only":
             session["ended_at"] = event["ts"]
             session["outcome"] = "played_only"
-        elif kind == "guided_review_played":
+        elif kind in {"guided_review_played", "guided_review_approved"}:
             session["reviewed_at"] = event["ts"]
             session["duration"] = event.get("duration")
         elif kind == "guided_press":
@@ -900,15 +930,52 @@ def build_data():
     def label(jid):
         return safe_contact_label(jid, names)
 
+    def message_identity(directory, name):
+        try:
+            with open(os.path.join(directory, name) + ".json") as handle:
+                metadata = json.load(handle)
+        except (OSError, TypeError, ValueError, json.JSONDecodeError):
+            metadata = {}
+        if not isinstance(metadata, dict):
+            metadata = {}
+
+        history_name = metadata.get("replay_history_file")
+        if not isinstance(history_name, str):
+            history_name = name
+        event = file_meta.get(history_name) or file_meta.get(name) or {}
+        chat = label(metadata.get("chat") or event.get("chat") or "")
+        sender = event.get("sender") or label(metadata.get("sender_jid") or "")
+        return chat, sender
+
     queue = list_wavs(QUEUE_DIR)
     hold = list_wavs(HOLD_DIR)
     trash = list_wavs(TRASH_DIR)
-    for kind, items in (("queue", queue), ("hold", hold), ("trash", trash)):
+    for kind, directory, items in (
+        ("queue", QUEUE_DIR, queue),
+        ("hold", HOLD_DIR, hold),
+        ("trash", TRASH_DIR, trash),
+    ):
         for item in items:
-            meta = file_meta.get(item["file"], {})
-            item["chat"] = label(meta.get("chat", "")) or "?"
-            item["sender"] = meta.get("sender") or "?"
+            item["chat"], item["sender"] = message_identity(directory, item["file"])
             item["token"] = public_message_token(kind, item.pop("file"))
+
+    recent = []
+    for record in list_played_history(QUEUE_DIR):
+        metadata = record["metadata"]
+        event = file_meta.get(record["file"], {})
+        media_type = metadata.get("media_type")
+        recent.append(
+            {
+                "ts": record["played_at"],
+                "dur": metadata.get("duration_s"),
+                "chat": label(event.get("chat") or metadata.get("chat", "")) or "?",
+                "sender": event.get("sender") or "?",
+                "media_kind": "video_soundtrack" if media_type == "video" else "voice_message",
+                "available": record["available"],
+                "queued": record["queued"],
+                "token": public_message_token("played", record["file"]),
+            }
+        )
 
     def avg(values):
         return round(sum(values) / len(values), 1) if values else None
@@ -947,6 +1014,7 @@ def build_data():
         "queue": queue,
         "hold": hold,
         "trash": trash,
+        "recently_played": recent,
     }
 
 
@@ -1053,7 +1121,13 @@ class Handler(BaseHTTPRequestHandler):
             if length < 0 or length > limit:
                 raise ValueError
             text = self.rfile.read(length).decode("utf-8")
-            pairs = urllib.parse.parse_qsl(text, keep_blank_values=True, strict_parsing=True)
+            # strict_parsing rejects an empty string, but an empty body is how
+            # the endpoints that take no fields are called.
+            pairs = (
+                urllib.parse.parse_qsl(text, keep_blank_values=True, strict_parsing=True)
+                if text
+                else []
+            )
             if len({key for key, _value in pairs}) != len(pairs):
                 raise ValueError
             return dict(pairs)
@@ -1084,15 +1158,19 @@ class Handler(BaseHTTPRequestHandler):
                 return self._send(409, json.dumps({"error": "Recipient setup is unavailable"}))
         if url.path == "/api/nfc-runtime":
             try:
-                enrollment = nfc_router().enrollment.active()
+                store = nfc_router().enrollment
+                enrollment = store.active()
+                attempt = urllib.parse.parse_qs(url.query).get("attempt", [""])[0]
+                outcome = store.outcome(attempt) if attempt else None
+                matching = enrollment and (not attempt or enrollment["request_id"] == attempt)
                 health_path = Path(NFC_HEALTH_FILE)
                 healthy = health_path.is_file() and time.time() - health_path.stat().st_mtime <= 10
                 return self._send(
                     200,
                     json.dumps(
                         {
-                            "status": "waiting" if enrollment else "idle",
-                            "recipient": enrollment.get("label") if enrollment else None,
+                            "status": outcome["status"] if outcome else ("waiting" if matching else "idle"),
+                            "recipient": enrollment.get("label") if matching else None,
                             "healthy": healthy,
                         }
                     ),
@@ -1118,7 +1196,9 @@ class Handler(BaseHTTPRequestHandler):
                 return self._send(503, json.dumps({"ok": False, "error": str(exc)}))
         if url.path.startswith("/audio/"):
             query = urllib.parse.parse_qs(url.query or "")
-            if query.get("hold") == ["1"]:
+            if query.get("played") == ["1"]:
+                d, kind = PLAYED_DIR, "played"
+            elif query.get("hold") == ["1"]:
                 d, kind = HOLD_DIR, "hold"
             elif query.get("trash") == ["1"]:
                 d, kind = TRASH_DIR, "trash"
@@ -1128,6 +1208,13 @@ class Handler(BaseHTTPRequestHandler):
             name = resolve_message_token(token, kind)
             if not name:
                 return self._send(400, "{}")
+            if kind == "played":
+                try:
+                    return self._send(
+                        200, read_played_file(QUEUE_DIR, name), "audio/wav"
+                    )
+                except FileNotFoundError:
+                    return self._send(404, "{}")
             path = os.path.join(d, name)
             if not os.path.exists(path):
                 return self._send(404, "{}")
@@ -1169,7 +1256,7 @@ class Handler(BaseHTTPRequestHandler):
                 preview_ringtone(payload["ringtone_id"])
             except SettingsError as exc:
                 return self._send(409, json.dumps({"ok": False, "error": str(exc)}))
-            return self._send(202, json.dumps({"ok": True}))
+            return self._send(200, json.dumps({"ok": True}))
         if url.path in {"/whatsapp/pair/start", "/whatsapp/pair/cancel", "/whatsapp/unlink"}:
             payload = self._form_body()
             if payload is None:
@@ -1219,14 +1306,24 @@ class Handler(BaseHTTPRequestHandler):
                         raise PairingError("recipient_request_invalid")
                     result = engine.recipient_defer()
                 elif url.path in {"/recipients/select-number", "/recipients/add-number"}:
-                    if set(payload) != {"phone"}:
+                    allowed_fields = (
+                        ({"phone"}, {"phone", "name"})
+                        if url.path == "/recipients/add-number"
+                        else ({"phone"},)
+                    )
+                    if set(payload) not in allowed_fields:
                         raise PairingError("phone_number_invalid")
                     operation = (
                         engine.recipient_select_phone
                         if url.path == "/recipients/select-number"
                         else engine.recipient_add_phone
                     )
-                    result = operation(normalize_phone(payload["phone"]))
+                    phone = normalize_phone(payload["phone"])
+                    result = (
+                        operation(phone, payload.get("name"))
+                        if "name" in payload
+                        else operation(phone)
+                    )
                 else:
                     if set(payload) != {"token"}:
                         raise PairingError("recipient_request_invalid")
@@ -1251,7 +1348,7 @@ class Handler(BaseHTTPRequestHandler):
                     if set(payload) != {"token"}:
                         raise NfcError("recipient token is invalid")
                     candidate = pairing_engine().recipients.configured_candidate(payload["token"])
-                    nfc_router().begin_enrollment(
+                    enrollment = nfc_router().begin_enrollment(
                         label=candidate["label"],
                         jid=candidate["jid"],
                         ttl_s=120,
@@ -1259,7 +1356,7 @@ class Handler(BaseHTTPRequestHandler):
                     )
                     return self._send(
                         202,
-                        json.dumps({"status": "waiting", "recipient": candidate["label"]}),
+                        json.dumps({"status": "waiting", "recipient": candidate["label"], "attempt": enrollment["request_id"]}),
                     )
                 if payload:
                     raise NfcError("NFC request is invalid")
@@ -1428,6 +1525,25 @@ class Handler(BaseHTTPRequestHandler):
             except OSError as e:
                 return self._send(500, json.dumps({"ok": False, "error": str(e)}))
             return self._send(202, '{"ok":true,"status":"queued"}')
+        if url.path == "/api/requeue":
+            q = urllib.parse.parse_qs(url.query or "")
+            token = (q.get("f") or [""])[0]
+            name = resolve_message_token(token, "played")
+            if not name:
+                return self._send(400, "{}")
+            try:
+                status = requeue_played_file(QUEUE_DIR, name)
+            except FileNotFoundError:
+                return self._send(
+                    409,
+                    json.dumps({"ok": False, "error": "Audio is no longer available"}),
+                )
+            except ValueError as exc:
+                return self._send(409, json.dumps({"ok": False, "error": str(exc)}))
+            except OSError as exc:
+                return self._send(500, json.dumps({"ok": False, "error": str(exc)}))
+            log_event(type="dash_requeue_played", status=status)
+            return self._send(200, json.dumps({"ok": True, "status": status}))
         q = urllib.parse.parse_qs(url.query or "")
         if url.path == "/api/hold":
             source_kind, source_dir, destination_dir = "queue", QUEUE_DIR, HOLD_DIR
@@ -1452,6 +1568,7 @@ class Handler(BaseHTTPRequestHandler):
                 source_dir,
                 destination_dir,
                 name,
+                queue_dir=QUEUE_DIR,
                 exposing_to_player=destination_dir == QUEUE_DIR,
             )
         except FileNotFoundError:

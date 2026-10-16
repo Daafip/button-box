@@ -1,5 +1,11 @@
 # Button Box
 
+![Illustrated Button Box with a glowing blue button and family portraits](assets/readme-hero.webp)
+
+> **[Join the Button Box WhatsApp community →](https://chat.whatsapp.com/FJ8LYL79k8zEMfoiyPjLPb?mode=gi_t)**
+>
+> Meet other builders, share progress, and help shape the project.
+
 **Button Box is a screen-free way for kids to send and receive WhatsApp voice
 messages with family on their own.**
 
@@ -9,8 +15,18 @@ approved person or group. Incoming replies wait on the box until the child
 presses the button to listen.
 
 [Visit button.box](https://button.box/) ·
-[Join the WhatsApp community](https://chat.whatsapp.com/FJ8LYL79k8zEMfoiyPjLPb?mode=gi_t) ·
-[Report an issue](https://github.com/button-box/button-box/issues)
+[Report an issue](https://github.com/button-box/button-box/issues) ·
+[Testing and regression matrix](docs/testing.md)
+
+## Latest release
+
+[v0.1.0](https://github.com/button-box/button-box/releases/tag/v0.1.0)
+includes voice messaging, video audio, recipient routing, the caregiver dashboard
+and startup recovery. Tested on Raspberry Pi 4. The source release includes
+a bounded updater, an installed-code manifest and checksums. Read the
+[release notes](docs/releases/v0.1.0.md) before
+installation. Each assembled unit requires its own physical acceptance run
+before delivery.
 
 
 ## Build a Button Box
@@ -30,6 +46,10 @@ The complete journey is:
 Each detailed step below ends with a **Done when** checkpoint. If the observed
 result differs, stop there and troubleshoot instead of pushing ahead.
 
+For repeatable release and per-unit verification, use the
+[canonical acceptance matrix](docs/box-acceptance.md) and its
+[per-unit run template](docs/box-acceptance-run-template.md).
+
 ## Step 1 — Buy your parts
 
 ### Choose a Raspberry Pi
@@ -45,8 +65,13 @@ request with the board and physical checks you performed.
 
 ### Parts with purchase links
 
-Choose one Pi, its matching power supply, and the shared parts below. We are not
-affiliated with these retailers.
+Two versions exist — pick the parts list that matches your enclosure:
+the [US parts list](#us-parts-list) or the [European parts list](#european-parts-list).
+We are not affiliated with these retailers.
+
+#### US parts list
+
+Choose one Pi, its matching power supply, and the shared parts below.
 
 - **Raspberry Pi Zero 2 W:** [official product and reseller page](https://www.raspberrypi.com/products/raspberry-pi-zero-2-w/?variant=raspberry-pi-zero-2-w)
 - **Or Raspberry Pi 4B:** [PiShop.US](https://www.pishop.us/product/raspberry-pi-4-model-b-1gb/), [Vilros](https://vilros.com/products/raspberry-pi-4-model-b-1), or [CanaKit](https://www.canakit.com/raspberry-pi-4.html)
@@ -59,21 +84,36 @@ affiliated with these retailers.
 - **NFC reader:** The original NFC build uses the [HiLetgo PN532 NFC/RFID module kit](https://www.amazon.com/dp/B01I1J17LC) and needs soldering. If you do not want to solder, use a Waveshare PN532 NFC HAT instead.
 - **Optional M2.5 screws, nuts, and washers:** [Amazon](https://www.amazon.com/dp/B0FJ1XN2XP) — useful for mounting the Pi or NFC board inside a custom enclosure; not required for a shoebox prototype
 
+The US reference-parts list is approximately **$150 before the enclosure,
+Zero 2 W adapters, NFC tokens, shipping, and taxes**. Retailer prices and
+availability change.
+
+This is our current US reference build. Other USB speakers and microphones, and other GPIO-connected buttons, may work electrically and with the software, but each substitution is unvalidated. The Original / US printable enclosure was designed for the parts in this list. If you change the speaker, microphone, or another part, the 3D-print designs may need a revision; do not assume the substitute will fit the same case.
+
+#### European parts list
+
+For the [EU S8 enclosure](hardware/enclosure/README.md) (EL001 speaker).
+Full parts list: [EU BOM](hardware/enclosure/eu-el001/BOM.md).
+
+- **Raspberry Pi 4 Model B (1 GB)**
+- **32 GB microSD card**
+- **HOTUT USB conference mic**
+- **EL-001 USB soundbar**
+- **EU USB mains supply** — 15 W USB-C recommended
+- **EG STARTS 100 mm illuminated arcade button, blue:** [Amazon](https://www.amazon.com/dp/B072JLSH34)
+- **Waveshare PN532 NFC HAT**
+- **Full-size NFC cards**
+- **Mounting fasteners, hook-up wire, and PLA feedstock** for the printed enclosure
+
 You will also need:
 
 - **NFC cards or tokens:** [Adafruit 13.56 MHz Classic 1K card](https://www.adafruit.com/product/359), which Adafruit states is tested with PN532 readers
 - **Hook-up wire and insulated connectors:** [0.25-inch arcade-button wire pairs](https://www.adafruit.com/product/3838) and an [assorted 2.8/4.8/6.3 mm spade-connector kit](https://www.adafruit.com/product/4748) are examples; confirm the terminal sizes on your button before ordering
 - **A microSD-card reader that fits your computer:** [USB-C example](https://www.adafruit.com/product/5212) or [USB-A example](https://www.adafruit.com/product/939)
 - **For Pi Zero 2 W, a suitable OTG USB hub**, powered if your selected audio devices require it. This [micro-USB OTG mini hub](https://www.adafruit.com/product/2991) is an example only; it has not yet been physically validated with the reference microphone and speaker.
-- **An enclosure:** use the [printable prototype enclosure](hardware/enclosure/README.md), a shoebox, or another sturdy, non-conductive container.
+- **An enclosure:** use a [printable enclosure](hardware/enclosure/README.md) — available in US and European versions, each with its own parts list — a shoebox, or another sturdy, non-conductive container.
 - **A computer with internet access** for preparing and provisioning the Pi
 - **A new, dedicated phone number for the Button Box WhatsApp account.** Add a line or eSIM through your mobile provider, activate it in the WhatsApp mobile app on a phone, and then link Button Box as a companion device.
-
-The current reference-parts list is approximately **$150 before the enclosure,
-Zero 2 W adapters, NFC tokens, shipping, and taxes**. Retailer prices and
-availability change.
-
-This is our current reference build. Other USB speakers and microphones, and other GPIO-connected buttons, may work electrically and with the software, but each substitution is unvalidated. The printable enclosure was designed for the parts in this list. If you change the speaker, microphone, or another part, the 3D-print designs may need a revision; do not assume the substitute will fit the same case.
 
 ### What the build takes
 
@@ -136,9 +176,9 @@ The default public GPIO configuration is:
 | PN532 data | I²C |
 
 > [!CAUTION]
-> A verified community wiring diagram is not in the repository yet. The pin
-> list above is a software configuration reference, not a complete wiring
-> diagram. Confirm button voltage, LED current limiting, connector sizes, Pi
+> A [community wiring diagram](hardware/README.md#community-wiring-diagram) is available,
+> with different PN532 reset/request pins and configuration notes. It has not
+> been physically validated. The pin list above remains the software default. Confirm button voltage, LED current limiting, connector sizes, Pi
 > pin numbering, and PN532 I²C mode before applying power. Never connect or
 > disconnect GPIO wiring while the Pi is powered.
 
@@ -169,6 +209,13 @@ In Imager:
 > [!CAUTION]
 > Writing an operating-system image erases the selected card. Confirm its
 > physical identity, capacity, and partitions before continuing.
+
+> [!IMPORTANT]
+> Imager remembers customisation from previous runs, including the Wi-Fi network
+> name and password, and pre-fills them. When re-flashing after a Pi that failed
+> to appear, retype the Wi-Fi name rather than accepting the remembered value: a
+> typo carries forward silently, and the retained setting is most likely to bite
+> exactly when you are trying to correct it.
 
 Insert the verified card into the powered-off Pi, connect temporary networking,
 and power it on.
@@ -396,6 +443,26 @@ Confirm that the Pi and computer are on a compatible network. Try the hostname
 you set in Imager. If necessary, inspect your router's device list rather than
 guessing a fixed IP address.
 
+Distinguish "not on the network" from "name not resolving" before changing
+anything. A Pi with a mistyped Wi-Fi name boots perfectly — solid red LED,
+flickering green, filesystem resized — and simply never joins. Scan your subnet
+for a Raspberry Pi MAC prefix (`dc:a6:32`, `e4:5f:01`, `b8:27:eb`):
+
+```sh
+arp -a | grep -iE 'dc:a6:32|e4:5f:01|b8:27:eb'
+```
+
+If nothing answers, the Pi is not on the network and the Wi-Fi settings are the
+place to look.
+
+You can check those settings **before first boot**. Raspberry Pi Imager writes
+them to the card's FAT boot partition as cloud-init files — `user-data`,
+`network-config` and `meta-data`, with `ds=nocloud` and
+`cfg80211.ieee80211_regdom=<CC>` in `cmdline.txt` — all readable from any
+computer. After first boot they are consumed, and the live configuration lives on
+the ext4 root partition, which macOS and Windows cannot read; at that point
+re-flashing is the practical fix.
+
 ### SSH says `Permission denied (publickey)`
 
 Confirm which SSH identity is being offered:
@@ -544,3 +611,4 @@ hardware, software, and audio remain subject to their own licenses and terms.
 Button Box uses [wacli](https://github.com/openclaw/wacli) and
 [Comitup](https://github.com/davesteele/comitup). It is not affiliated with or
 endorsed by WhatsApp or Meta.
+--- sha: f40a0195ab57e6bc33c950bdb755f7ea276145e4 ---
