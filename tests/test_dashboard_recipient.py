@@ -4,6 +4,7 @@ import tempfile
 import unittest
 from pathlib import Path
 from types import SimpleNamespace
+from urllib.parse import urlencode
 from unittest.mock import patch
 
 
@@ -18,6 +19,7 @@ class DashboardContactTests(unittest.TestCase):
             name: getattr(dashboard, name)
             for name in (
                 "CONTACTS_FILE",
+                "NFC_SELECTION_FILE",
                 "EVENTS_FILE",
                 "QUEUE_DIR",
                 "HOLD_DIR",
@@ -27,6 +29,7 @@ class DashboardContactTests(unittest.TestCase):
             )
         }
         dashboard.CONTACTS_FILE = root / "contacts.json"
+        dashboard.NFC_SELECTION_FILE = root / "nfc-selection.json"
         dashboard.EVENTS_FILE = str(root / "events.jsonl")
         dashboard.QUEUE_DIR = str(root / "queue")
         dashboard.HOLD_DIR = str(root / "queue" / ".hold")
@@ -77,6 +80,67 @@ class DashboardContactTests(unittest.TestCase):
         )
         handler.do_GET()
         return responses[0]
+
+    def post_form(self, path, payload):
+        body = urlencode(payload).encode()
+        handler = dashboard.Handler.__new__(dashboard.Handler)
+        handler.path = path
+        handler.headers = {
+            "Content-Length": str(len(body)),
+            "Content-Type": "application/x-www-form-urlencoded",
+            "Host": "button-box.local",
+        }
+        handler.client_address = ("192.168.1.20", 12345)
+        handler.local_host = "button-box.local"
+        handler.tailscale_host = None
+        handler.rfile = io.BytesIO(body)
+        responses = []
+        handler._send = lambda code, data, ctype="application/json": responses.append(
+            (code, json.loads(data))
+        )
+        handler.do_POST()
+        return responses[0]
+
+    def test_recipient_phone_form_accepts_optional_name_field(self):
+        calls = []
+        engine = SimpleNamespace(
+            recipient_add_phone=lambda phone, name: calls.append((phone, name)) or {}
+        )
+
+        with patch.object(dashboard, "pairing_engine", return_value=engine):
+            code, result = self.post_form(
+                "/recipients/add-number",
+                {"phone": "+1 555 123 4567", "name": ""},
+            )
+
+        self.assertEqual(code, 200)
+        self.assertEqual(result, {})
+        self.assertEqual(calls, [("+15551234567", "")])
+
+    def test_recipient_selection_rejects_name_field(self):
+        engine = SimpleNamespace(recipient_select_phone=lambda phone: {})
+
+        with patch.object(dashboard, "pairing_engine", return_value=engine):
+            code, result = self.post_form(
+                "/recipients/select-number",
+                {"phone": "+1 555 123 4567", "name": "Not accepted here"},
+            )
+
+        self.assertEqual(code, 409)
+        self.assertEqual(result["error"], "phone number invalid")
+
+    def test_runtime_pairing_requires_matching_success_receipt(self):
+        store = SimpleNamespace(
+            active=lambda: None,
+            outcome=lambda attempt: {"status": "success"} if attempt == "confirmed" else None,
+        )
+        with patch.object(dashboard, "nfc_router", return_value=SimpleNamespace(enrollment=store)):
+            code, result = self.get("/api/nfc-runtime?attempt=confirmed")
+            self.assertEqual(code, 200)
+            self.assertEqual(result["status"], "success")
+            self.assertNotIn("request_id", result)
+            self.assertEqual(self.get("/api/nfc-runtime?attempt=cancelled")[1]["status"], "idle")
+            self.assertEqual(self.get("/api/nfc-runtime")[1]["status"], "idle")
 
     def test_missing_store_starts_empty_without_a_default_recipient_gate(self):
         with patch.object(dashboard, "discover_whatsapp_chats", return_value=[]):
@@ -220,6 +284,33 @@ class DashboardContactTests(unittest.TestCase):
 
         self.assertIsNone(dashboard.contacts_store().resolve_card(private_uid))
         self.assertEqual(dashboard.contacts_store().allowed_jids(), (group,))
+
+    def test_presented_card_unpairs_with_an_empty_form_body(self):
+        """The endpoint takes no fields, so the UI posts an empty body."""
+        from messagebox.nfc_state import SelectionStore
+
+        direct = "15550001@s.whatsapp.net"
+        uid = bytes(range(4))
+        discovered = [{"jid": direct, "label": "Grandma", "kind": "person"}]
+        with patch.object(dashboard, "discover_whatsapp_chats", return_value=discovered):
+            self.post("/api/contacts", {"action": "add", "jid": direct, "label": "Grandma"})
+        store = dashboard.contacts_store()
+        store.assign_card(direct, uid)
+        SelectionStore(dashboard.NFC_SELECTION_FILE).select(
+            uid, direct, store.public_view()["revision"]
+        )
+
+        code, _body = self.post_form("/nfc/unpair-presented", {})
+
+        self.assertEqual(code, 200)
+        after = dashboard.contacts_store()
+        self.assertIsNone(after.resolve_card(uid))
+        self.assertEqual(after.allowed_jids(), (direct,), "the person is kept")
+
+    def test_empty_form_body_reaches_the_endpoint_rather_than_the_parser(self):
+        code, body = self.post_form("/nfc/unpair-presented", {})
+        self.assertEqual(code, 409)
+        self.assertIn("Present a paired NFC card", body["error"])
 
     def test_add_rejects_malformed_and_undiscovered_jids(self):
         discovered = [

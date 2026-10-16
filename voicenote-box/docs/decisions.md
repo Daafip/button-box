@@ -62,10 +62,15 @@ the WAV on the way past, so there is nothing to change if it is.
 the utterance ends. The wall-clock measurement is still
 [a hardware task](verification.md).
 
+## Open question 1 is settled: no Voice PE
+
+The plan left "Voice PE firmware fork vs dedicated second satellite" to be
+decided in Phase 1. It is decided: the box uses its own ESPHome satellite,
+and a Voice PE is left alone as an ordinary Assist device. Nothing here
+forks upstream firmware. See [hardware.md](hardware.md).
+
 ## Open questions left open
 
-- **Voice PE fork vs a dedicated second satellite** (1) — a hardware and
-  maintenance decision, discussed in [hardware.md](hardware.md).
 - **Whether the API audio stream survives a long recording** (2) — only
   measurable on the board.
 - **Transcoding location** (4) — ffmpeg runs in the add-on. Home Assistant's

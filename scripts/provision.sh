@@ -82,7 +82,9 @@ rsync -azR \
   "$REPO_DIR/./messagebox/button_send.py" \
   "$REPO_DIR/./messagebox/contacts.py" \
   "$REPO_DIR/./messagebox/guided_reply.py" \
+  "$REPO_DIR/./messagebox/identity.py" \
   "$REPO_DIR/./messagebox/listened_receipts.py" \
+  "$REPO_DIR/./messagebox/played_history.py" \
   "$REPO_DIR/./messagebox/make_ringtones.py" \
   "$REPO_DIR/./messagebox/nfc.py" \
   "$REPO_DIR/./messagebox/nfc_state.py" \
@@ -96,10 +98,12 @@ rsync -azR \
   "$REPO_DIR/./messagebox/dashboard/app.py" \
   "$REPO_DIR/./messagebox/onboarding/__init__.py" \
   "$REPO_DIR/./messagebox/onboarding/app.py" \
+  "$REPO_DIR/./messagebox/onboarding/activity.py" \
   "$REPO_DIR/./messagebox/onboarding/comitup_adapter.py" \
   "$REPO_DIR/./messagebox/onboarding/connectivity.py" \
   "$REPO_DIR/./messagebox/onboarding/completion.py" \
   "$REPO_DIR/./messagebox/onboarding/initialize.py" \
+  "$REPO_DIR/./messagebox/onboarding/mode.py" \
   "$REPO_DIR/./messagebox/onboarding/nfc.py" \
   "$REPO_DIR/./messagebox/onboarding/paths.py" \
   "$REPO_DIR/./messagebox/onboarding/recipients.py" \
@@ -108,6 +112,7 @@ rsync -azR \
   "$REPO_DIR/./messagebox/onboarding/voice_gate.py" \
   "$REPO_DIR/./messagebox/onboarding/whatsapp.py" \
   "$REPO_DIR/./messagebox/onboarding/static/app.js" \
+  "$REPO_DIR/./messagebox/onboarding/static/clipboard.js" \
   "$REPO_DIR/./messagebox/onboarding/static/index.html" \
   "$REPO_DIR/./messagebox/onboarding/static/styles.css" \
   "$REPO_DIR/./systemd/" \

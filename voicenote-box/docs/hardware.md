@@ -10,20 +10,20 @@ has to be yours to change.
 | --- | --- |
 | **DIY ESP32-S3** | Best fit. You already own the YAML; merging the overlay is a few lines |
 | **M5Stack Atom Echo** | Fine as a trigger and microphone. Its speaker is too tinny for voice notes — set `media_player_entity` to a real speaker for playback |
-| **Home Assistant Voice PE** | Needs a fork of `home-assistant-voice-pe`, maintained across upstream releases. See below |
+| **Home Assistant Voice PE** | Not supported. See below |
 
-### The Voice PE question
+### Why not a Voice PE
 
-Adding the actions to a Voice PE means forking its firmware repository and
-rebasing that fork every time upstream releases. That is a standing
-maintenance cost for two API actions.
+A Voice PE cannot be given these actions without forking
+`home-assistant-voice-pe` and rebasing that fork on every upstream release —
+a standing maintenance cost for two API actions.
 
-The escape hatch is to leave the Voice PE untouched and dedicate a cheap
-second satellite to the box. An ESP32-S3 with an I2S microphone costs less
-than the hours the fork will take, and the Voice PE keeps getting updates.
+The box does not need one. A dedicated ESP32-S3 satellite with an I2S
+microphone costs less than the hours the fork would take, and nothing else
+in this project depends on the Voice PE hardware.
 
-**Decide this before flashing anything.** It is the one choice in this
-project that is expensive to reverse.
+If you already own a Voice PE, leave it alone as your normal Assist device
+and give the box its own satellite. That is the supported arrangement.
 
 ## The button node
 

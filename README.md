@@ -1,546 +1,293 @@
-# Button Box
+# Voice Note Box
 
-**Button Box is a screen-free way for kids to send and receive WhatsApp voice
-messages with family on their own.**
+**A fork of [Button Box](https://github.com/button-box/button-box) that runs
+on Home Assistant instead of a Raspberry Pi.**
 
-Button Box is an open-source hardware and software project built around one
-large illuminated button. A child can record a voice note and send it to an
-approved person or group. Incoming replies wait on the box until the child
-presses the button to listen.
+Hold a button, speak, and the voice note goes to an approved contact.
+Replies wait on the box: an LED ring shows that one is waiting, and a short
+press plays it. The satellite that records stays an ordinary Assist device,
+so wake word and spoken commands keep working throughout.
 
-[Visit button.box](https://button.box/) ·
-[Join the WhatsApp community](https://chat.whatsapp.com/FJ8LYL79k8zEMfoiyPjLPb?mode=gi_t) ·
-[Report an issue](https://github.com/button-box/button-box/issues)
+> **Status:** the add-on is written and covered by 208 unit tests, but none
+> of it has run on real hardware yet. The [test plan](#test-plan) below is
+> the work that is left.
 
+## What this fork adds
 
-## Build a Button Box
+Upstream Button Box is a stand-alone Raspberry Pi with a USB microphone and
+speaker that talks WhatsApp through `wacli`. This fork adds a second build of
+the same idea:
 
-The complete journey is:
-
-1. Buy the parts.
-2. Assemble the hardware.
-3. Prepare a Raspberry Pi OS microSD card.
-4. Download this repository.
-5. Connect to and inspect the Pi.
-6. Provision Button Box.
-7. Link WhatsApp, choose approved recipients, and optionally pair NFC tags.
-8. Test the physical hardware.
-9. Send, receive, play, and repeat after a reboot.
-
-Each detailed step below ends with a **Done when** checkpoint. If the observed
-result differs, stop there and troubleshoot instead of pushing ahead.
-
-## Step 1 — Buy your parts
-
-### Choose a Raspberry Pi
-
-| Board | Current status | What to expect |
+| | Upstream Pi build | This fork's add-on |
 | --- | --- | --- |
-| **Raspberry Pi 4B** | Recommended for a first build | The public installation path has been physically exercised through Wi-Fi and WhatsApp readiness. |
-| **Raspberry Pi Zero 2 W** | Supported device target; public installation gap | It needs an OTG USB hub for the USB microphone and speaker. On current `main`, provisioning stops at the Pi-4-only Comitup installer, so the fresh-card community path still needs validation. |
-
-Do not bypass a board-safety check on a working device. If you want to help
-finish the Zero 2 W path, please join the community or open a focused pull
-request with the board and physical checks you performed.
-
-### Parts with purchase links
-
-Choose one Pi, its matching power supply, and the shared parts below. We are not
-affiliated with these retailers.
-
-- **Raspberry Pi Zero 2 W:** [official product and reseller page](https://www.raspberrypi.com/products/raspberry-pi-zero-2-w/?variant=raspberry-pi-zero-2-w)
-- **Or Raspberry Pi 4B:** [PiShop.US](https://www.pishop.us/product/raspberry-pi-4-model-b-1gb/), [Vilros](https://vilros.com/products/raspberry-pi-4-model-b-1), or [CanaKit](https://www.canakit.com/raspberry-pi-4.html)
-- **32 GB SanDisk Ultra A1 microSD card:** [Amazon](https://www.amazon.com/dp/B08L5HMJVW/)
-- **TONOR G11 USB microphone:** [Amazon](https://www.amazon.com/dp/B07GVGMW59)
-- **LIELONGREN 8 W USB speaker:** [Amazon](https://www.amazon.com/dp/B08QRYTPGH)
-- **Pi Zero 2 W power supply:** [official Raspberry Pi 12.5 W Micro USB Power Supply](https://www.raspberrypi.com/products/micro-usb-power-supply/)
-- **Or Pi 4B power supply:** [iUniker 5 V / 4 A USB-C supply](https://www.amazon.com/dp/B097P2NLVH)
-- **100 mm illuminated arcade button:** [Amazon](https://www.amazon.com/dp/B072JLSH34)
-- **NFC reader:** The original NFC build uses the [HiLetgo PN532 NFC/RFID module kit](https://www.amazon.com/dp/B01I1J17LC) and needs soldering. If you do not want to solder, use a Waveshare PN532 NFC HAT instead.
-- **Optional M2.5 screws, nuts, and washers:** [Amazon](https://www.amazon.com/dp/B0FJ1XN2XP) — useful for mounting the Pi or NFC board inside a custom enclosure; not required for a shoebox prototype
-
-You will also need:
-
-- **NFC cards or tokens:** [Adafruit 13.56 MHz Classic 1K card](https://www.adafruit.com/product/359), which Adafruit states is tested with PN532 readers
-- **Hook-up wire and insulated connectors:** [0.25-inch arcade-button wire pairs](https://www.adafruit.com/product/3838) and an [assorted 2.8/4.8/6.3 mm spade-connector kit](https://www.adafruit.com/product/4748) are examples; confirm the terminal sizes on your button before ordering
-- **A microSD-card reader that fits your computer:** [USB-C example](https://www.adafruit.com/product/5212) or [USB-A example](https://www.adafruit.com/product/939)
-- **For Pi Zero 2 W, a suitable OTG USB hub**, powered if your selected audio devices require it. This [micro-USB OTG mini hub](https://www.adafruit.com/product/2991) is an example only; it has not yet been physically validated with the reference microphone and speaker.
-- **An enclosure:** use the [printable prototype enclosure](hardware/enclosure/README.md), a shoebox, or another sturdy, non-conductive container.
-- **A computer with internet access** for preparing and provisioning the Pi
-- **A new, dedicated phone number for the Button Box WhatsApp account.** Add a line or eSIM through your mobile provider, activate it in the WhatsApp mobile app on a phone, and then link Button Box as a companion device.
-
-The current reference-parts list is approximately **$150 before the enclosure,
-Zero 2 W adapters, NFC tokens, shipping, and taxes**. Retailer prices and
-availability change.
-
-This is our current reference build. Other USB speakers and microphones, and other GPIO-connected buttons, may work electrically and with the software, but each substitution is unvalidated. The printable enclosure was designed for the parts in this list. If you change the speaker, microphone, or another part, the 3D-print designs may need a revision; do not assume the substitute will fit the same case.
-
-### What the build takes
-
-- Comfort following terminal commands one step at a time, or access to an AI
-  coding agent that can guide you
-- Raspberry Pi Imager and permission to erase a microSD card
-- Temporary Wi-Fi, Ethernet, USB Ethernet, or Internet Sharing during setup
-- Time to assemble, install, test each component, and troubleshoot an alpha
-  build
-
-> [!NOTE]
-> The public product is **Button Box**. Some commands, package names, hostnames,
-> and services still use the historical internal name `messagebox`. Use those
-> exact names for now.
-
-### Once your parts arrive — build with an agent
-
-Point a capable coding agent at this repository and give it this prompt:
-
-```text
-Help me build a Button Box from this repository:
-https://github.com/button-box/button-box
-
-Read README.md and AGENTS.md before giving instructions. First ask whether I
-have a Raspberry Pi Zero 2 W or Raspberry Pi 4B. Work one numbered step at a
-time and wait for me to confirm each physical result.
-
-The goal is to have a working box that sends and receives voice messages.
-Do not ask me to paste credentials, phone numbers, WhatsApp identifiers, Wi-Fi
-details, NFC identifiers, recordings, or authentication files into the chat.
-Stop if my physical result differs from the README checkpoint.
-```
-
-A helpful agent should:
-
-- identify the Pi model before choosing parts or commands
-- explain each command before asking the builder to run it
-- use each **Done when** result as a checkpoint
-- stop when physical evidence differs from the guide
-- never guess a disk, network address, GPIO connection, or WhatsApp recipient
-- preserve a working card or device rather than experimenting on it
-- redact private information before helping prepare an issue
-
-Button Box uses [wacli](https://github.com/openclaw/wacli), an unofficial
-WhatsApp Web client. Button Box is not affiliated with or endorsed by WhatsApp
-or Meta.
-
-## Step 2 — Assemble the hardware
-
-A shoebox or another sturdy, non-conductive box is an alternative to 3D printing the enclosure. Whichever enclosure you use, secure the electronics, provide ventilation, and protect the cables from strain and loose metal.
-
-The default public GPIO configuration is:
-
-| Connection | BCM/board name |
-| --- | --- |
-| Record button | BCM GPIO 17 |
-| Button LED | BCM GPIO 26 |
-| PN532 reset | D20 |
-| PN532 request | D16 |
-| PN532 data | I²C |
-
-> [!CAUTION]
-> A verified community wiring diagram is not in the repository yet. The pin
-> list above is a software configuration reference, not a complete wiring
-> diagram. Confirm button voltage, LED current limiting, connector sizes, Pi
-> pin numbering, and PN532 I²C mode before applying power. Never connect or
-> disconnect GPIO wiring while the Pi is powered.
-
-For the printable prototype, download the [top](hardware/enclosure/button-box-enclosure-top.stl)
-and [bottom](hardware/enclosure/button-box-enclosure-bottom.stl) enclosure files.
-
-**Done when:** the unpowered assembly is mechanically secure, every connection
-has been independently checked, and there are no loose conductors or shorts.
-
-## Step 3 — Prepare the microSD card
-
-Install the current [Raspberry Pi Imager](https://www.raspberrypi.com/software/)
-on your computer.
-
-In Imager:
-
-1. Select your exact Raspberry Pi model.
-2. Select **Raspberry Pi OS Lite (64-bit)** based on Debian 13.
-3. Choose the correct microSD card.
-4. Set a hostname such as `button-box-001`. Existing `message-box-*` hostnames remain supported.
-5. Create a non-root administrator such as `admin`.
-6. Enable SSH, preferably with a dedicated public key.
-7. Give the Pi temporary internet access through Imager Wi-Fi settings,
-   Ethernet, USB Ethernet, or Internet Sharing.
-8. Leave Raspberry Pi Connect disabled unless you deliberately need it.
-9. Confirm the exact removable card before writing.
-
-> [!CAUTION]
-> Writing an operating-system image erases the selected card. Confirm its
-> physical identity, capacity, and partitions before continuing.
-
-Insert the verified card into the powered-off Pi, connect temporary networking,
-and power it on.
-
-**Done when:** the Pi boots and responds at its `.local` hostname.
-
-## Step 4 — Download Button Box on your computer
-
-On the computer that will provision the Pi:
-
-```sh
-git clone https://github.com/button-box/button-box.git
-cd button-box
-```
-
-Confirm the checkout and required host commands:
-
-```sh
-git status --short --branch
-ssh -V
-rsync --version
-```
-
-On macOS, use a modern GNU rsync rather than the built-in `openrsync`:
-
-```sh
-brew install rsync
-PATH="/opt/homebrew/bin:$PATH" rsync --version
-```
-
-**Done when:** the repository is on your computer and SSH plus modern rsync are
-available.
-
-## Step 5 — Connect to and inspect the Pi
-
-Replace `admin` and the hostname below if you chose different values:
-
-```sh
-ssh admin@button-box-001.local
-```
-
-On the Pi, verify the model, architecture, and operating-system release:
-
-```sh
-tr -d '\0' </proc/device-tree/model
-uname -m
-grep -E '^(PRETTY_NAME|VERSION_CODENAME)=' /etc/os-release
-```
-
-Expected architecture: `aarch64`
-
-Expected Debian codename: `trixie`
-
-Exit the Pi:
-
-```sh
-exit
-```
-
-**Done when:** the detected model matches your chosen board and the supported
-64-bit OS is running.
-
-## Step 6 — Install Button Box
-
-> [!IMPORTANT]
-> Continue with the automated public installer on Raspberry Pi 4B. On current
-> `main`, the install stops on Pi Zero 2 W because `scripts/install/comitup.sh`
-> is explicitly validated only on Pi 4. Zero 2 W runtime support remains, but
-> its fresh-card installation path needs a tested repository change.
-
-From the repository root on your computer:
-
-```sh
-./scripts/provision.sh admin@button-box-001.local
-```
-
-On macOS with Homebrew rsync:
-
-```sh
-PATH="/opt/homebrew/bin:$PATH" ./scripts/provision.sh admin@button-box-001.local
-```
-
-The script transfers an explicit set of installation files, installs Button Box
-in fixed system paths, and leaves runtime and onboarding services stopped.
-
-**Done when:** setup prints `BUTTON BOX SETUP COMPLETE` without an error.
-
-## Step 7 — Choose an onboarding path
-
-### Path A: terminal-assisted DIY build
-
-This is currently the shortest path to a working experimental box. It uses the
-Pi's temporary network connection and does not use the consumer Wi-Fi portal.
-
-Run from your computer:
-
-```sh
-ssh -t admin@button-box-001.local messagebox-dev-onboard
-```
-
-The guided workflow will:
-
-1. Link or verify WhatsApp.
-2. Display recent chats with their exact WhatsApp identifiers.
-3. Configure the first approved recipient.
-4. Optionally configure the private dashboard.
-5. Offer to test the physical hardware.
-6. Enable and start the selected runtime services.
-
-Enter phone numbers and other private values directly into the terminal when
-prompted. Do not paste them into an agent conversation or GitHub issue.
-
-**Done when:** the workflow reports WhatsApp ready, the exact intended recipient
-is configured, the selected hardware tests pass, and the selected services are
-enabled and started.
-
-### Path B: browser Wi-Fi and WhatsApp onboarding
-
-This path is the intended household experience from Wi-Fi through normal
-runtime activation.
-
-Initialize the protected onboarding identity:
-
-```sh
-ssh -t admin@button-box-001.local sudo messagebox-init-wifi-onboarding
-```
-
-Record the displayed hotspot name, hotspot password, and setup URL privately.
-Then arm onboarding:
-
-```sh
-ssh -t admin@button-box-001.local sudo messageboxctl reset-wifi
-```
-
-On a phone:
-
-1. Join the Button Box setup hotspot.
-2. Open the supplied setup URL.
-3. Select home Wi-Fi and enter its password.
-4. Rejoin home Wi-Fi when the setup hotspot disappears.
-5. Open the same `http://button-box-001.local/` address.
-6. Link WhatsApp with the displayed phone code.
-7. Choose a default recipient and complete the guided two-way voice test.
-8. Allow any additional recipients and optionally pair NFC tags.
-9. Skip NFC setup or choose Done to activate messaging.
-
-NFC is optional. A zero-tag setup routes new standalone messages to the default
-recipient without depending on the reader. Once any tag is mapped, unsafe NFC
-health or unknown tag state blocks rather than silently choosing the default.
-Path A remains the terminal-assisted developer workflow; the two paths are not
-continuations of one another.
-
-**Done when:** the browser reports that Button Box is ready and the intended
-default and optional tag mappings pass the physical scenarios below.
-
-## Step 8 — Test the hardware
-
-The terminal-assisted onboarding offers this test automatically. To run it
-separately, connect to the Pi and run it as the `messagebox` service user:
-
-```sh
-ssh -t admin@button-box-001.local
-sudo -u messagebox -H /opt/messagebox/dev/hardware-test.sh
-```
-
-The interactive test checks:
-
-- internet access
-- speaker
-- microphone and playback
-- button LED
-- record button
-- PN532 reader and an NFC card
-- WhatsApp authentication
-
-It does not send a WhatsApp message or reveal NFC identifiers.
-
-**Done when:** every installed component passes, or any deliberately omitted
-component is documented.
-
-## Step 9 — Start the box and complete the first message loop
-
-Check the selected services:
-
-```sh
-messageboxctl services
-messageboxctl status
-```
-
-With an approved recipient expecting the test:
-
-1. Hold the physical button and record a short message.
-2. Release the button and follow the box's confirmation behavior.
-3. Confirm that the message reaches the intended recipient.
-4. Ask the recipient to reply with a voice note.
-5. Confirm the box queues and plays the reply.
-6. Reboot the Pi.
-7. Repeat a short send-and-receive check.
-
-**Done when:** the real button, LED, microphone, speaker, network, WhatsApp
-account, recipient routing, send, reply, playback, and reboot behavior all pass
-on the physical device.
-
-## What works today
-
-| Capability | Status | What that means |
-| --- | --- | --- |
-| Device runtime | **Experimental** | Recording, sending, receiving, playback, fail-closed recipient routing, and NFC support exist. |
-| Raspberry Pi 4B | **Supported** | A brand-new-card installation has been physically completed through Wi-Fi and WhatsApp onboarding. |
-| Raspberry Pi Zero 2 W | **Supported device target; install gap** | The device target is supported, but the current public provisioning path still contains a Pi-4-only Comitup gate and needs clean-install validation. |
-| Wi-Fi and WhatsApp browser onboarding | **Experimental** | The physical Pi 4B flow has reached verified WhatsApp readiness. |
-| Recipient and NFC browser onboarding | **Experimental** | Repository coverage is included; fresh-Pi NFC and final activation acceptance are still required. |
-| Enclosure | **Prototype** | Printable [top and bottom STL files](hardware/enclosure/README.md) are available. |
-| Complete first-message journey from public instructions | **In progress** | Physical proof is still needed for recipient setup, NFC where used, runtime startup, send, reply, playback, and reboot using only this README. |
-
-Automated tests and repository review do not prove a physical Pi, phone, Wi-Fi,
-GPIO, NFC, audio, or WhatsApp journey. Please say exactly what you tested when
-reporting success or opening a pull request.
-
-## Troubleshooting
-
-### The Pi hostname does not resolve
-
-Confirm that the Pi and computer are on a compatible network. Try the hostname
-you set in Imager. If necessary, inspect your router's device list rather than
-guessing a fixed IP address.
-
-### SSH says `Permission denied (publickey)`
-
-Confirm which SSH identity is being offered:
-
-```sh
-ssh -v admin@button-box-001.local
-```
-
-If you created a dedicated key, select it explicitly in your SSH configuration
-or with `ssh -i`.
-
-### Provisioning says `scripts/setup.sh: No such file or directory`
-
-On macOS, confirm that `rsync --version` reports modern GNU rsync and rerun
-provisioning with Homebrew first in `PATH`.
-
-### The installer says Comitup is validated only on Raspberry Pi 4
-
-You are installing on a different Pi model. This is the current public Zero 2 W
-installation gap described above. Do not edit out the model check on a working
-device; follow or help with the clean-install validation work instead.
-
-### The setup hotspot does not appear
-
-Keep a separate recovery connection when possible. Check onboarding services:
-
-```sh
-messageboxctl logs onboarding
-```
-
-Do not share unredacted output publicly.
-
-### The wrong Wi-Fi password was entered
-
-The onboarding flow should return to a retryable hotspot state. If recovery is
-required, `sudo messageboxctl reset-wifi` removes saved infrastructure Wi-Fi
-profiles and restarts onboarding.
-
-### WhatsApp pairing expires
-
-Return to the home-network setup page and request another code. An interrupted
-attempt should not promote an unverified authentication store.
-
-### A service will not start
-
-Check:
-
-```sh
-messageboxctl services
-messageboxctl status
-```
-
-Before posting logs, remove phone numbers, WhatsApp identifiers, Wi-Fi details,
-NFC identifiers, recordings, private addresses, and authentication state.
-
-## Privacy and security
-
-Button Box stores configuration, approved contacts, WhatsApp authentication
-state, and queued audio locally on the Pi. These files must never be committed
-to Git or copied into public diagnostics.
-
-The dashboard has no login. Leave it disabled unless you understand the network
-exposure. If enabled, bind it only to a private address you control.
-
-Do not put security-sensitive details in a public issue. Contact the maintainers
-through the community and ask for a private disclosure channel first.
-
-## Updating and recovery
-
-Button Box uses fixed installed paths rather than running directly from the
-repository checkout. Re-run the provisioning script to install a reviewed
-update.
-
-Before updating a working physical box:
-
-1. Confirm the exact source commit.
-2. Stop Button Box services.
-3. Preserve rollback material.
-4. Provision the reviewed tree.
-5. Verify services and real device behavior.
-6. Keep repository validation separate from physical acceptance.
-
-## Get help
-
-Use [GitHub Issues](https://github.com/button-box/button-box/issues) for
-reproducible bugs and documentation problems, or
-[join the community](https://chat.whatsapp.com/FJ8LYL79k8zEMfoiyPjLPb?mode=gi_t)
-for builder discussion.
-
-A useful issue includes:
-
-- Pi model
-- Raspberry Pi OS release
-- Button Box commit
-- the numbered build step
-- expected result
-- actual result
-- sanitized error text
-
-Never include credentials, phone numbers, WhatsApp identifiers, NFC identifiers,
-recordings, private addresses, or authentication files.
-
-## Contributing
-
-Community contributions are welcome, especially:
-
-- beginner-tested installation instructions
-- Pi Zero 2 W and Pi 4B build photographs
-- wiring and assembly diagrams
-- enclosure designs
-- accessibility improvements
-- recovery and troubleshooting guides
-- hardware compatibility reports
-- focused tests and fixes
-
-Before opening a pull request:
+| Code | [`messagebox/`](messagebox/) | [`voicenote-box/`](voicenote-box/) |
+| Runs on | Raspberry Pi 4B or Zero 2 W | A Home Assistant add-on |
+| Microphone and speaker | USB, on the Pi | An ESPHome voice satellite |
+| Button and light | GPIO on the Pi | A separate ESPHome node with an LED ring |
+| Messaging | WhatsApp via `wacli` | Telegram first; Signal, `wacli` and WhatsApp Cloud adapters exist |
+| When Home Assistant is down | Keeps working | Does nothing, and the ring says so |
+
+The two share no code. `messagebox/` and the folders around it are
+upstream's Raspberry Pi build, unchanged and merged in from upstream. Its
+build instructions are in the
+[upstream README](https://github.com/button-box/button-box#readme).
+
+## How it works
+
+The add-on sits between Home Assistant and Whisper as a Wyoming
+speech-to-text proxy. Every utterance streams through to Whisper as usual.
+When the button is held, Home Assistant first arms voice note mode over
+REST, then opens the satellite's microphone. The proxy keeps that one
+recording, queues it for the selected contact, and returns a fixed sentence
+that makes Assist answer "Verzonden".
+
+The diagram, the safety properties and the code layout are in the
+[add-on README](voicenote-box/README.md). The original plan, with its
+phases, is in [voicenote-box-plan.md](voicenote-box-plan.md).
+
+## What you need
+
+### Home Assistant
+
+- Home Assistant OS or Supervised. Add-ons need the Supervisor.
+- The Whisper, Piper, Mosquitto broker and ESPHome add-ons, and the MQTT
+  integration.
+- A Dutch Assist pipeline that already works on the satellite. The custom
+  sentences are in Dutch.
+
+### Hardware
+
+[hardware.md](voicenote-box/docs/hardware.md) has the details.
+
+- A voice satellite whose ESPHome firmware you build yourself. A DIY
+  ESP32-S3 fits best. An M5Stack Atom Echo works as microphone and trigger,
+  with a separate speaker for playback. A Voice PE is not supported.
+- A button node: a plain ESP32, an arcade button between GPIO16 and ground,
+  and a 12-LED WS2812 ring on GPIO5.
+- For Phase 5: a few NFC tags, and the Home Assistant Companion app on a
+  phone to scan them.
+
+### Telegram account
+
+- A Telegram account on your phone to receive notes and reply. A second
+  account, or a friend's, for the not-enrolled and second-contact checks.
+
+## Test plan
+
+Work from top to bottom and tick the boxes as you go. The plan's rule
+stands: do not start a phase until the one before it passes. The same
+acceptance criteria, with more background, are in
+[verification.md](voicenote-box/docs/verification.md).
+[setup.md](voicenote-box/docs/setup.md) has the details of every install
+step.
+
+### Before you start
+
+- [ ] `make check` passes on your machine (see [Development](#development)).
+- [ ] The satellite works with your normal pipeline on Whisper: wake word
+      plus "zet de lamp aan" switches a light. Without this baseline you
+      cannot tell later failures apart.
+- [ ] Mosquitto is running and the MQTT integration is set up.
+
+### Telegram bot
+
+- [ ] Create a bot: message **@BotFather** and send `/newbot`. Treat the
+      token like a password; it is the bot's only credential.
+- [ ] On your phone, open the bot and press **Start**. A bot cannot message
+      anyone who has not started it. The first note would fail permanently
+      and the box would block recording.
+- [ ] Send the bot any message, open
+      `https://api.telegram.org/bot<token>/getUpdates` in a browser, and note
+      `message.chat.id`. That number is the address you enrol. Do this
+      **before** the add-on runs with this token: once it is polling, your
+      request competes with it for the same updates. The URL contains the
+      token, so do not share or screenshot it.
+
+### Install the add-on
+
+- [ ] Copy `voicenote-box/` to `/addons/voicenote-box` on the Home Assistant
+      host. Then go to **Settings → Add-ons → Add-on Store → ⋮ → Check for
+      updates** and install *Voice Note Box* from Local add-ons.
+- [ ] Set the options: `api_token` (generate one with
+      `openssl rand -hex 24`), `transport: telegram`, `telegram_token`, and
+      `announce_entity` (your satellite's `assist_satellite.…`). Set
+      `media_player_entity` if the satellite's own speaker is too poor, as
+      on an Atom Echo. For Phases 0 and 1, set
+      `assist_recording_retention_seconds: 300`.
+- [ ] Start the add-on. The log shows it running without errors, and the
+      bot token appears nowhere in it.
+
+### Phase 0 — the proxy leaves Assist alone
+
+- [ ] Add the **Wyoming Protocol** integration with the Home Assistant
+      host's address and port `10400`. In your pipeline, set Speech-to-text
+      to *Voice Note Box (…)* and change nothing else.
+- [ ] Wake word plus "zet de lamp aan" still works exactly as before. If it
+      does not, stop here.
+- [ ] The command's WAV is in `/data/recordings/`, ending in `-assist.wav`.
+      The add-on's `/data` is not visible in the file editor. From the
+      Advanced SSH & Web Terminal add-on, with protection mode off, run
+      `docker exec addon_local_voicenote_box ls /data/recordings`.
+- [ ] Latency: run the same command five times with the pipeline on Whisper
+      directly, and five times through the proxy. Compare the
+      speech-to-text times in the pipeline's debug view (**Settings → Voice
+      assistants → your pipeline → ⋮ → Debug**). Write the numbers down. A
+      clear difference is a finding.
+
+### Phase 1 — button and recording
+
+- [ ] Flash `voicenote-box/esphome/button-node.yaml`. Set the pins in
+      `substitutions`, add `voicenote_button_api_key`,
+      `voicenote_button_ota_password`, `wifi_ssid` and `wifi_password` to
+      your ESPHome secrets, and adopt the node in Home Assistant.
+- [ ] Merge the two blocks from `voicenote-box/esphome/satellite-overlay.yaml`
+      into your satellite's configuration and reflash it.
+- [ ] Install the Home Assistant side as in
+      [setup.md §5](voicenote-box/docs/setup.md#5-home-assistant-configuration).
+      That means the files in `config/voicenote/`, the sentences in
+      `config/custom_sentences/nl/`, the four `voicenote_*` secrets, the
+      includes, and every entity id marked `CHANGE ME`. Then restart Home
+      Assistant.
+- [ ] In the **Voice notes** sidebar panel, enrol yourself with transport
+      `telegram` and your chat id as the address. Select yourself as the
+      recipient.
+- [ ] Hold the button for 8 seconds. The add-on log says
+      `queued voice note … (8.0s)`, give or take a little. Telegram is
+      already configured, so the note is also sent; that is checked in
+      Phase 3.
+- [ ] The wake word does not fire during the recording, and works again
+      right after.
+- [ ] A spoken command straight afterwards still works, and leaves an
+      `-assist.wav` rather than a voice note.
+- [ ] A tap of under half a second does **not** start a recording.
+- [ ] Hold for 10, 30 and 60 seconds. Check that each log line shows the
+      full length. On some boards the audio stream may cut out on long
+      holds (the plan's open question 2). 60 seconds is the
+      `max_recording_seconds` cap.
+- [ ] Set `assist_recording_retention_seconds` back to `0`. It keeps
+      everything anyone says to the satellite.
+
+### Phase 2 — the spoken confirmation
+
+This build does not play a recorded note back locally. The first playback
+check is the Telegram reply in Phase 4.
+
+- [ ] After you release the button, the box says "Verzonden naar …". If it
+      says "sorry, dat begreep ik niet", the custom sentence and the
+      `sent_sentence` option do not match.
+- [ ] The confirmation does not trigger the wake word.
+
+### Phase 3 — sending over Telegram
+
+- [ ] Hold, speak and release. Within a few seconds a playable voice message
+      from the bot appears in your Telegram chat.
+- [ ] The ring goes from solid red (recording) to a fast orange pulse
+      (sending), then back to dim white (idle).
+- [ ] Unplug the router while a note is sending. The note stays in the
+      *Outbox* sensor instead of disappearing, and arrives once the
+      network is back.
+- [ ] Stop Home Assistant. The ring changes to a slow red pulse. Start Home
+      Assistant again, and the ring returns to idle.
+
+### Phase 4 — replies
+
+- [ ] Reply to the bot from your phone with a voice message. The ring
+      pulses blue and *Unread voice notes* shows 1.
+- [ ] A short press plays the reply on the box, or on
+      `media_player_entity`, and you can understand it. The counter
+      returns to 0.
+- [ ] With a reply waiting, restart Home Assistant, and separately restart
+      the add-on. The reply is still there and still plays.
+- [ ] A voice message from a Telegram account that is not enrolled never
+      shows up.
+- [ ] Let the person the box is for tap and hold a few times. Tap (play)
+      and hold (record) must be reliably different for them, not just for
+      you.
+
+### Phase 5 — recipients and safety
+
+- [ ] Enrol a second contact. To use a group: add the bot to the group, and
+      in @BotFather send `/setprivacy` and choose **Disable**. Otherwise
+      the bot only sees replies to its own messages. Stop the add-on while
+      you read the group's chat id from `getUpdates`. Group ids are
+      negative.
+- [ ] Scan each NFC tag with the Companion app, and find its id under
+      **Settings → Tags**. Link it to a contact in the Voice notes panel.
+      Scanning each mapped tag selects the right contact. Check every tag,
+      not one.
+- [ ] Scan a mapped tag, then an unmapped one, then hold the button. The
+      ring flashes red, and the box must refuse to record. It must not send
+      to the first tag's contact.
+- [ ] With no recipient selected (`geen`), holding the button flashes the
+      ring red and records nothing.
+- [ ] Remove a contact while a note to them is still queued. That note
+      fails; it is not sent to anyone else.
+- [ ] Hold past `max_recording_seconds`. The recording stops at the cap.
+- [ ] Set `rate_limit_per_hour` low, for example `2`, and send past it. The
+      box refuses out loud instead of silently dropping the note.
+- [ ] Enrol a contact with a chat id that never started the bot, and send
+      to it. The note fails permanently. Recording is then blocked, and
+      the panel says so. **Mislukte berichten wissen** unblocks it.
+
+### Phase 6 — packaging
+
+- [ ] On a clean Home Assistant, the add-on installs with nothing beyond
+      [setup.md](voicenote-box/docs/setup.md).
+- [ ] The Voice notes panel shows the contacts and both queues.
+- [ ] A backup and restore of the add-on keeps the contacts and the queue.
+- [ ] Optional, only if you move off Telegram: the Signal adapter works
+      against a real `signal-cli-rest-api`. The `wacli` adapter works
+      against a real linked session on a dedicated number, never a personal
+      one. `wacli` still needs a sync process and a binary in the image;
+      see [transports.md](voicenote-box/docs/transports.md).
+
+## Development
 
 ```sh
 make check
 ```
 
-State clearly which checks were automated and which Pi, phone, network, audio,
-GPIO, NFC, Wi-Fi, or WhatsApp behaviors were physically tested.
+This runs upstream's suite and the add-on's 208 tests, which need no
+hardware or network. It needs Python 3.13, `uv` and `bun`, the same as CI.
+To run only the add-on's tests:
+
+```sh
+cd voicenote-box && python3 -m unittest discover -s tests
+```
+
+If your umask is `0002`, 21 of upstream's updater tests fail, because the
+updater refuses group-writable files. Running `chmod -R g-w .` once in the
+checkout fixes it. Git does not track those bits, so it creates no diff.
+
+## Keeping up with upstream
+
+```sh
+git remote add upstream https://github.com/button-box/button-box.git   # once per clone
+git fetch upstream
+git merge upstream/main
+```
+
+Upstream edits its README often, but this README belongs to the fork.
+Resolve a conflict here with `git checkout --ours README.md`. The other
+files both sides touch are `Makefile`, `.github/workflows/ci.yml` and
+`AGENTS.md`. Resolve those by keeping both sides' lines.
 
 ## Repository map
 
-- `messagebox/`: device runtime, dashboard, and onboarding package
-- `messagebox/dashboard/static/`: private dashboard assets
-- `messagebox/onboarding/static/`: household onboarding portal
-- `scripts/`: installation, provisioning, and command wrappers
-- `scripts/dev/`: experimental developer onboarding and hardware checks
-- `systemd/`: device services and runtime target
-- `config/`: public configuration and pinned dependencies
-- `hardware/`: [hardware list and printable enclosure files](hardware/README.md)
-- `sounds/`: audio licensing requirements and future assets
-- `tests/`: synthetic unit and contract tests
-- `docs/`: architecture, installation, testing, and developer documentation
-- `voicenote-box/`: [a separate Home Assistant + ESPHome build](voicenote-box/README.md) of the
-  same idea, sharing no code with the Raspberry Pi runtime above
+- `voicenote-box/`: the Home Assistant add-on, with its own
+  [README](voicenote-box/README.md), docs, ESPHome and Home Assistant files,
+  and tests
+- `voicenote-box-plan.md`: the original plan, phases and open questions
+- `messagebox/`, `scripts/`, `systemd/`, `config/`, `hardware/`, `sounds/`,
+  `docs/`, `tests/`: upstream's Raspberry Pi build
+- `Makefile`, `.github/`: the checks for both
 
 ## License and acknowledgements
 
-Button Box software is licensed under the [MIT License](LICENSE). Third-party
-hardware, software, and audio remain subject to their own licenses and terms.
+MIT, see [LICENSE](LICENSE). This is a fork of
+[button-box/button-box](https://github.com/button-box/button-box), and the
+Raspberry Pi build is its contributors' work. Third-party hardware, software
+and audio remain subject to their own licenses and terms.
 
-Button Box uses [wacli](https://github.com/openclaw/wacli) and
-[Comitup](https://github.com/davesteele/comitup). It is not affiliated with or
-endorsed by WhatsApp or Meta.
+This project is not affiliated with or endorsed by Telegram, WhatsApp, Meta,
+or Home Assistant.
